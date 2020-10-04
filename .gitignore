@@ -1,5 +1,11 @@
-__pycache__
+# IDE related
 .vscode
+
+# Python generated
+__pycache__
+build/*
+dist/*
+texsnip.egg-info
 
 # generated test images
 *.pdf
