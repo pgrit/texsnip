@@ -1,0 +1,7 @@
+__pycache__
+.vscode
+
+# generated test images
+*.pdf
+*.png
+*.pptx

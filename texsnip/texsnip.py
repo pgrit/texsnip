@@ -1,0 +1,113 @@
+import subprocess
+import os
+import tempfile
+import shutil
+
+def compile_and_crop(tex, name, intermediate_dir = None):
+    """ Compiles the given LaTeX code.
+
+    Args:
+        - tex   The file content of the LaTeX file to compile
+        - name  Name of the output without the .pdf extension
+        - intermediate_dir  Specify an existing directory here and .tex and .log files will be kept there
+    """
+    if intermediate_dir is not None and os.path.isdir(intermediate_dir):
+        temp_folder = None
+        temp_dir = os.path.abspath(intermediate_dir)
+    else:
+        temp_folder = tempfile.TemporaryDirectory()
+        temp_dir = temp_folder.name
+
+    with open(os.path.join(temp_dir, f"{name}.tex"), "w") as fp:
+        fp.write(tex)
+
+    subprocess.check_call(["pdflatex", "-interaction=nonstopmode", f"{name}.tex"], cwd=temp_dir, stdout=subprocess.DEVNULL)
+    subprocess.check_call(["pdfcrop", f"{name}.pdf"], cwd=temp_dir, stdout=subprocess.DEVNULL)
+    shutil.copy(os.path.join(temp_dir, f"{name}-crop.pdf"), f"{name}.pdf")
+
+    if temp_folder is not None:
+        temp_folder.cleanup()
+
+class Snip:
+    def __init__(self, name, fontsize_pt, content):
+        self._name = str(name)
+        self.fontsize_pt = fontsize_pt
+        self.content = content
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def fontsize_pt(self):
+        return self._fontsize_pt
+
+    @fontsize_pt.setter
+    def fontsize_pt(self, value):
+        try:
+            sz = float(value)
+        except:
+            raise ValueError("fontsize must be a number (real or integer)")
+
+        if sz <= 0:
+            raise ValueError("fontsize must not be negative!")
+
+        self._fontsize_pt = value
+
+    @property
+    def content(self):
+        return self._content
+
+    @content.setter
+    def content(self, value):
+        self._content = str(value)
+
+    def generate(self, preamble=r"\usepackage{libertine}", intermediate_dir=None):
+        tex_code = r"""
+            \documentclass{article}
+            \pagenumbering{gobble}
+            \usepackage{xcolor}
+            \usepackage{graphicx}
+            \usepackage[utf8]{inputenc}
+            \usepackage[T1]{fontenc}
+        """
+        tex_code += preamble
+        tex_code += r"\begin{document}"
+        tex_code += r"{\fontsize{" + f"{self.fontsize_pt}" + "pt}{" + f"{self.fontsize_pt + 1}" + r"pt}\selectfont\raggedright"
+        tex_code += self.content
+        tex_code += r"} \end{document}"
+
+        compile_and_crop(tex_code, self.name, intermediate_dir)
+
+    def generate_png(self, preamble=r"\usepackage{libertine}", intermediate_dir=None, dpi=300):
+        self.generate(preamble, intermediate_dir)
+
+        from pdf2image import convert_from_path
+        convert_from_path(self.name + ".pdf", dpi=dpi, transparent=True, fmt="png", output_file=self.name, single_file=True, output_folder=".")
+
+def pptx_snips(snips, filename="snips.pptx", preamble=r"\usepackage{libertine}", intermediate_dir=None, dpi=300):
+    from PyPDF2 import PdfFileReader
+    from pptx import Presentation
+    from pptx.util import Pt
+
+    # Create a new .pptx with a single slide
+    prs = Presentation()
+    blank_slide_layout = prs.slide_layouts[6]
+    slide = prs.slides.add_slide(blank_slide_layout)
+
+    ypos_pt = 8
+    for s in snips:
+        s.generate_png(preamble, intermediate_dir, dpi)
+
+        # Compute the pdf file size so we can scale the png to the correct size
+        # Not doing so would make fontsizes inconsistent
+        box = PdfFileReader(open(s.name + ".pdf", "rb")).getPage(0).mediaBox
+        width_pt = box.upperRight[0]
+        height_pt = box.upperRight[1]
+
+        # Place the .png with the correct size in points
+        slide.shapes.add_picture(s.name + ".png", Pt(8), Pt(ypos_pt), width=Pt(width_pt))
+
+        ypos_pt += height_pt + 8
+
+    prs.save(filename)
