@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="texsnip", # Replace with your own username
-    version="1.0.0",
+    version="1.0.1",
     author="Pascal Grittmann",
     author_email="grittmann@cg.uni-saarland.de",
     description="Tiny package to quickly add LaTeX text to your favorite vector graphics package.",
