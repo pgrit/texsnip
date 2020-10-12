@@ -2,6 +2,7 @@ import subprocess
 import os
 import tempfile
 import shutil
+import re
 
 def compile_and_crop(tex, name, intermediate_dir = None):
     """ Compiles the given LaTeX code.
@@ -63,18 +64,41 @@ class Snip:
         self._content = str(value)
 
     def generate(self, preamble=r"\usepackage{libertine}", intermediate_dir=None):
-        tex_code = r"""
-            \documentclass{article}
-            \pagenumbering{gobble}
-            \usepackage{xcolor}
-            \usepackage{graphicx}
-            \usepackage[utf8]{inputenc}
-            \usepackage[T1]{fontenc}
-        """
+        tex_code = "\n".join([
+            r"\documentclass{article}",
+            r"\pagenumbering{gobble}",
+            r"\usepackage{xcolor}",
+            r"\usepackage{graphicx}",
+            r"\usepackage[utf8]{inputenc}",
+            r"\usepackage[T1]{fontenc}",
+            r"\usepackage{geometry}",
+            r"\geometry{",
+            r"    papersize={500cm,500cm},",
+            r"    total={500cm,500cm},",
+            r"    left=0mm,",
+            r"    top=0mm,",
+            r"}",
+            ""
+        ])
+
         tex_code += preamble
         tex_code += r"\begin{document}"
-        tex_code += r"{\fontsize{" + f"{self.fontsize_pt}" + "pt}{" + f"{self.fontsize_pt + 1}" + r"pt}\selectfont\raggedright"
-        tex_code += self.content
+
+        # scale the fontsize
+        fontcmd = r"{\fontsize{" + f"{self.fontsize_pt}" + "pt}{" + f"{0}" + r"pt}"
+        fontcmd += r"\selectfont\raggedright" + "\n"
+
+        # scale math accordingly, using scalebox to also adjust large operators like \sum
+        scalecmd = r"}\\scalebox{" + f"{self.fontsize_pt/10}" + "}{"
+        fontcmd_regex = r"{\\fontsize{" + f"{self.fontsize_pt}" + "pt}{" + f"{0}" + r"pt}"
+        fontcmd_regex += r"\\selectfont\\raggedright" + "\n"
+        print(fontcmd_regex)
+        wrapped_math = re.sub(r"(\$.*\$)", scalecmd + r"\1}" + fontcmd_regex, self.content)
+
+        tex_code += fontcmd + wrapped_math
+        tex_code += "\n"
+
+        # tex_code += self.content + "\n"
         tex_code += r"} \end{document}"
 
         compile_and_crop(tex_code, self.name, intermediate_dir)
