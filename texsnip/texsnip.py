@@ -92,7 +92,6 @@ class Snip:
         scalecmd = r"}\\scalebox{" + f"{self.fontsize_pt/10}" + "}{"
         fontcmd_regex = r"{\\fontsize{" + f"{self.fontsize_pt}" + "pt}{" + f"{0}" + r"pt}"
         fontcmd_regex += r"\\selectfont\\raggedright" + "\n"
-        print(fontcmd_regex)
         wrapped_math = re.sub(r"(\$.*\$)", scalecmd + r"\1}" + fontcmd_regex, self.content)
 
         tex_code += fontcmd + wrapped_math
