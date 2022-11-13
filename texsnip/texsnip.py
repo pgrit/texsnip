@@ -4,16 +4,35 @@ import tempfile
 import shutil
 import re
 
+def red(txt):
+    return "\033[0;31m" + txt + "\033[00m"
+
 def extract_errors(logfile):
-    with open(logfile) as fp:
-        lines = fp.readlines()
+    """ Basic parsing of pdflatex log files.
+
+    Tries to find each line that contains an error message and outputs that line and a number
+    of following lines.
+    """
+    with open(logfile) as fp: lines = fp.readlines()
 
     num_lines = 5
-    def concat(i): return "\n".join([lines[j] for j in range(i, i + num_lines)])
+    def concat(i):
+        def non_empty():
+            for j in range(i, min(i + num_lines, len(lines))):
+                if lines[j].strip():
+                    yield lines[j]
+        return (
+            red("==========================================\n") +
+            red("LaTeX error:\n") +
+            "------------------------------------------\n" +
+            "".join([ l for l in non_empty() ]) +
+            red("==========================================")
+        )
 
     for i in range(len(lines)):
         if "error:" in lines[i] or "Error:" in lines[i]: yield concat(i)
-        if ".tex:"in lines[i]: yield concat(i)
+        elif ".tex:"in lines[i]: yield concat(i)
+        elif lines[i].startswith("! "): yield concat(i)
 
 def compile_and_crop(tex, name, intermediate_dir = None):
     """ Compiles the given LaTeX code.
@@ -22,6 +41,9 @@ def compile_and_crop(tex, name, intermediate_dir = None):
         - tex   The file content of the LaTeX file to compile
         - name  Name of the output without the .pdf extension
         - intermediate_dir  Specify an existing directory here and .tex and .log files will be kept there
+
+    Returns:
+        True if compilation succeeded, false otherwise. Error messages will be printed in the console.
     """
     if intermediate_dir is not None and os.path.isdir(intermediate_dir):
         temp_folder = None
@@ -37,25 +59,25 @@ def compile_and_crop(tex, name, intermediate_dir = None):
         subprocess.check_call([
                 "pdflatex",
                 "-interaction=batchmode",
-                "-c-style-errors",
-                "-error-line=254",
-                "-half-error-line=238",
-                "-max-print-line=1000",
                 f"{name}.tex"
             ], cwd=temp_dir, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         logfile = os.path.join(temp_dir, f"{name}.log")
         if not os.path.exists(logfile):
-            print("No log was written.")
+            print(red("Error: pdflatex failed, but no log was written."))
         else:
             print("\n".join([errline for errline in extract_errors(logfile)]))
-        print("pdflatex failed. You can view the full log by specifying an intermediate_dir")
+            print(red(f"Error: pdflatex failed. Syntax error or missing package? "
+                "You can view the full log in {logfile}. This path can be changed by specifying an intermediate_dir"))
+        return False
 
     subprocess.check_call(["pdfcrop", f"{name}.pdf"], cwd=temp_dir, stdout=subprocess.DEVNULL)
     shutil.copy(os.path.join(temp_dir, f"{name}-crop.pdf"), f"{name}.pdf")
 
     if temp_folder is not None:
         temp_folder.cleanup()
+
+    return True
 
 class Snip:
     def __init__(self, name, fontsize_pt, content):
