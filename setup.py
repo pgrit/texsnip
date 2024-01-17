@@ -4,8 +4,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="texsnip", # Replace with your own username
-    version="1.0.2",
+    name="texsnip",
+    version="1.1.0",
     author="Pascal Grittmann",
     author_email="grittmann@cg.uni-saarland.de",
     description="Tiny package to quickly add LaTeX text to your favorite vector graphics package.",
