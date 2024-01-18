@@ -19,7 +19,7 @@ jobs:
         python-version: '3.11'
 
     - name: Fetch Python build dependencies
-      run: python -m pip install --user wheel
+      run: python -m pip install --user build wheel
 
     - name: Build
       run: python -m build
